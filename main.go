@@ -61,6 +61,20 @@ func press(g *ga.GAFloat32Genome) float32 {
 	symbols <- input
 	close(symbols)
 	bits := compress.Coder16{Alphabit: 256, Input: symbols}.FilteredAdaptiveCoder(newCDF).Code(buffer)
+
+	if Verify {
+		out, i := make([]byte, len(data)), 0
+		output := func(symbol uint16) bool {
+			out[i] = byte(symbol)
+			i++
+			return i >= len(out)
+		}
+		compress.Coder16{Alphabit: 256, Output: output}.FilteredAdaptiveDecoder(newCDF).Decode(buffer)
+
+		if bytes.Compare(out, data) != 0 {
+			panic("decompression failed")
+		}
+	}
 	return float32(bits)
 }
 
