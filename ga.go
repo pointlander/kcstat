@@ -10,6 +10,29 @@ import (
 	ga "github.com/pointlander/go-galib"
 )
 
+type GACDF2Initializer struct{}
+
+func (i *GACDF2Initializer) InitPop(first ga.GAGenome, popsize int) (pop []ga.GAGenome) {
+	pop = make([]ga.GAGenome, popsize)
+	pop[0] = first.Copy().(*ga.GAFloat32Genome)
+	for x := 1; x < popsize; x++ {
+		genome := first.Copy().(*ga.GAFloat32Genome)
+		pop[x] = genome
+		for i := 0; i < 256; i++ {
+			offset := i * 256
+			for j := 0; j < 256; j++ {
+				genome.Gene[offset+j] += rand.Float32() * .1
+				if genome.Gene[offset+j] > 1 {
+					genome.Gene[offset+j] = 1
+				}
+			}
+		}
+	}
+	return pop
+}
+
+func (i *GACDF2Initializer) String() string { return "CDF2Initializer" }
+
 type GACDFInitializer struct{}
 
 func (i *GACDFInitializer) InitPop(first ga.GAGenome, popsize int) (pop []ga.GAGenome) {

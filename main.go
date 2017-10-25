@@ -44,7 +44,14 @@ func press(g *ga.GAFloat32Genome) float32 {
 			}
 			for j := range m[:Symbols] {
 				m[j] = uint16(sum)
-				sum += int(1 + g.Gene[offset+j]*(compress.CDFScale-Symbols)/total)
+				sum += int(1 + (g.Gene[offset+j] * (compress.CDFScale - Symbols) / total))
+				if Verify && j > 0 {
+					if a, b := m[j], m[j-1]; a < b {
+						panic(fmt.Sprintf("invalid mixin cdf %v,%v < %v,%v; sum=%v", j, a, j-1, b, sum))
+					} else if a == b {
+						panic(fmt.Sprintf("invalid mixin cdf %v,%v = %v,%v; sum=%v", j, a, j-1, b, sum))
+					}
+				}
 			}
 			m[Symbols] = compress.CDFScale
 			mixin[i] = m
@@ -89,16 +96,48 @@ func main() {
 	}
 	data = alice
 
+	stats, first := [Symbols][Symbols]int{}, ga.NewFloat32Genome(make([]float32, Width), press, 1, 0)
+	for i := range alice[:len(alice)-Symbols] {
+		for j := 0; j < Symbols; j++ {
+			stats[alice[i]][alice[i+j]]++
+		}
+	}
+	for i := range first.Gene {
+		first.Gene[i] = .1
+	}
+	for i := 0; i < Symbols; i++ {
+		total, offset := 0, i*256
+		for j := 0; j < Symbols; j++ {
+			total += stats[i][j]
+		}
+		if total == 0 {
+			continue
+		}
+		for j := 0; j < Symbols; j++ {
+			first.Gene[offset+j] = float32(stats[i][j]) / float32(total)
+		}
+	}
+
+	input := make([]uint16, len(data))
+	for i := range data {
+		input[i] = uint16(data[i])
+	}
+	symbols, buffer := make(chan []uint16, 1), &bytes.Buffer{}
+	symbols <- input
+	close(symbols)
+	bits := compress.Coder16{Alphabit: 256, Input: symbols}.FilteredAdaptiveCoder(compress.NewCDF).Code(buffer)
+	fmt.Printf("size = %.3f %.3f\n", float64(bits)/8, float64(bits)/(8*float64(len(data))))
+
 	mutator := ga.NewMultiMutator()
 	msh := new(ga.GAShiftMutator)
 	msw := new(ga.GASwitchMutator)
-	gm := NewGABoundedGaussianMutator(0.3, 0)
+	gm := NewGABoundedGaussianMutator(0.1, 0)
 	mutator.Add(msh)
 	mutator.Add(msw)
 	mutator.Add(gm)
 
 	param := ga.GAParameter{
-		Initializer: new(GACDFInitializer),
+		Initializer: new(GACDF2Initializer),
 		Selector:    ga.NewGATournamentSelector(0.2, 5),
 		PMutate:     0.5,
 		PBreed:      0.2,
@@ -107,11 +146,14 @@ func main() {
 	}
 	gao := ga.NewGA(param)
 	gao.Parallel = true
-	gao.Init(200, ga.NewFloat32Genome(make([]float32, Width), press, 1, 0))
+	gao.Init(200, first)
 
 	gao.OptimizeUntil(func(best ga.GAGenome) bool {
 		score := best.Score() / 8
-		fmt.Printf("best = %v\n", score)
+		fmt.Printf("best = %.3f %.3f %.3f\n",
+			score,
+			score/float64(len(data)),
+			8*score/float64(bits))
 		return score < .3*float64(len(alice))
 	})
 }
