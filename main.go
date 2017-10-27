@@ -25,7 +25,7 @@ const (
 var data []byte
 
 func press(g *ga.GAFloat32Genome) float32 {
-	newCDF := func(size int) *compress.CDF {
+	newCDF := func(size int) *compress.CDF16 {
 		if size != 256 {
 			panic("size is not 256")
 		}
@@ -44,7 +44,7 @@ func press(g *ga.GAFloat32Genome) float32 {
 			}
 			for j := range m[:Symbols] {
 				m[j] = uint16(sum)
-				sum += int(1 + (g.Gene[offset+j] * (compress.CDFScale - Symbols) / total))
+				sum += int(1 + (g.Gene[offset+j] * (compress.CDF16Scale - Symbols) / total))
 				if Verify && j > 0 {
 					if a, b := m[j], m[j-1]; a < b {
 						panic(fmt.Sprintf("invalid mixin cdf %v,%v < %v,%v; sum=%v", j, a, j-1, b, sum))
@@ -53,11 +53,11 @@ func press(g *ga.GAFloat32Genome) float32 {
 					}
 				}
 			}
-			m[Symbols] = compress.CDFScale
+			m[Symbols] = compress.CDF16Scale
 			mixin[i] = m
 		}
 
-		return &compress.CDF{
+		return &compress.CDF16{
 			CDF:    cdf,
 			Mixin:  mixin,
 			Verify: Verify,
@@ -125,7 +125,7 @@ func main() {
 	symbols, buffer := make(chan []uint16, 1), &bytes.Buffer{}
 	symbols <- input
 	close(symbols)
-	bits := compress.Coder16{Alphabit: 256, Input: symbols}.FilteredAdaptiveCoder(compress.NewCDF).Code(buffer)
+	bits := compress.Coder16{Alphabit: 256, Input: symbols}.FilteredAdaptiveCoder(compress.NewCDF16).Code(buffer)
 	fmt.Printf("size = %.3f %.3f\n", float64(bits)/8, float64(bits)/(8*float64(len(data))))
 
 	mutator := ga.NewMultiMutator()
