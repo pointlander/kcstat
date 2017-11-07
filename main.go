@@ -29,13 +29,7 @@ func press(g *ga.GAFloat32Genome) float32 {
 		if size != 256 {
 			panic("size is not 256")
 		}
-		cdf, mixin := make([]uint16, size+1), make([][]uint16, size)
-
-		sum := 0
-		for i := range cdf {
-			cdf[i] = uint16(sum)
-			sum += 32
-		}
+		root, mixin := compress.NewNode16(size), make([][]uint16, size)
 
 		for i := range mixin {
 			sum, m, offset, total := 0, make([]uint16, size+1), i*Symbols, float32(0)
@@ -58,9 +52,11 @@ func press(g *ga.GAFloat32Genome) float32 {
 		}
 
 		return &compress.CDF16{
-			CDF:    cdf,
-			Mixin:  mixin,
-			Verify: Verify,
+			Size:    size,
+			Root:    root,
+			Context: make([]uint16, 0),
+			Mixin:   mixin,
+			Verify:  Verify,
 		}
 	}
 
@@ -125,7 +121,7 @@ func main() {
 	symbols, buffer := make(chan []uint16, 1), &bytes.Buffer{}
 	symbols <- input
 	close(symbols)
-	bits := compress.Coder16{Alphabit: 256, Input: symbols}.FilteredAdaptiveCoder(compress.NewCDF16).Code(buffer)
+	bits := compress.Coder16{Alphabit: 256, Input: symbols}.FilteredAdaptiveCoder(compress.NewCDF16(0, Verify)).Code(buffer)
 	fmt.Printf("size = %.3f %.3f\n", float64(bits)/8, float64(bits)/(8*float64(len(data))))
 
 	mutator := ga.NewMultiMutator()
