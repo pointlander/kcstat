@@ -25,7 +25,7 @@ const (
 var data []byte
 
 func press(g *ga.GAFloat32Genome) float32 {
-	newCDF := func(size int) *compress.CDF16 {
+	newCDF := func(size int) compress.Filtered16 {
 		if size != 256 {
 			panic("size is not 256")
 		}
